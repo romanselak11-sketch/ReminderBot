@@ -1,10 +1,6 @@
-from aiogram.types import (ReplyKeyboardMarkup, KeyboardButton,
-                           InlineKeyboardMarkup, InlineKeyboardButton)
+from aiogram.types import (ReplyKeyboardMarkup, KeyboardButton)
 
 keyboard = ReplyKeyboardMarkup(keyboard=[
-    [KeyboardButton(text='Мои напоминания'), KeyboardButton(text='Новое напоминание')]
+    [KeyboardButton(text='Мои события'), KeyboardButton(text='Новое событие')],
+    [KeyboardButton(text='Удалить событие'), KeyboardButton(text='Помощь')]
 ], resize_keyboard=True, input_field_placeholder='Выберите действие из меню')
-
-inline_keyboard = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text="Новое напоминание", url='https://ya.ru')]
-])
