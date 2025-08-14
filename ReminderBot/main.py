@@ -4,6 +4,7 @@ import os
 import asyncio
 from aiogram import Bot, Dispatcher
 from app.handlers import router
+from remind_db.db_excecuter import CreateDB, CreateTable
 
 load_dotenv()
 API_TOKEN = os.getenv('API_TOKEN')
@@ -19,6 +20,8 @@ async def main():
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
+    create_db = CreateDB()
+    create_table = CreateTable()
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
