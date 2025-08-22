@@ -4,7 +4,8 @@ from aiogram.types import Message, CallbackQuery
 from app.app.keyboards import keyboard as kb
 from app.app.states import ReminderStates
 from aiogram.fsm.context import FSMContext
-from app.app.deferred_task import add_one_reminder_to_scheduler, get_all_user_reminders, get_id_all_user_reminders, del_user_reminders
+from app.app.deferred_task import (add_one_reminder_to_scheduler, get_all_user_reminders,
+                                   get_id_all_user_reminders, del_user_reminders)
 from app.app.parse_time import parse_time_zone, parse_text_in_date
 from app.remind_db.db_excecuter import add_user_to_db, get_user_timezone
 from logger_config import get_logger
@@ -31,6 +32,7 @@ async def add_timezone(message: Message, state: FSMContext):
     await message.answer('\U000023F0 Введите ваш часовой пояс в формате: +5:00/+05:00\n\n'
                          'Пример: Для Москвы и Московской области часовой пояс: +3:00/+03:00',
                          reply_markup=kb)
+
 
 @router.message(condition.timezone)
 async def add_timezone_to_db(message: Message, state: FSMContext):
@@ -59,6 +61,7 @@ async def cmd_create(message: Message, state: FSMContext):
     await state.set_state(condition.messages)
     await message.answer(f'\U0000270D О чём тебе напомнить?')
 
+
 @router.message(condition.messages)
 async def reminder_date(message: Message, state: FSMContext):
     logger.info(f'Пользователь прислал нам событие, о котором нужно напоминть: {message.text}')
@@ -66,6 +69,7 @@ async def reminder_date(message: Message, state: FSMContext):
     await state.set_state(condition.reminder_date)
     logger.info(f'Спрашиваем у пользователя дату')
     await message.answer(f'\U000023F0 Когда напомнить?\n\n')
+
 
 @router.message(condition.reminder_date)
 async def add_reminder(message: Message, state: FSMContext):
@@ -100,17 +104,19 @@ async def add_reminder(message: Message, state: FSMContext):
 
     await state.clear()
 
+
 @router.message(Command('events'))
 async def cmd_events(message: Message):
     logger.info('Ищем события пользователя')
     try:
         reminders = await get_all_user_reminders(message.chat.id)
         if reminders:
-            await message.answer(f'Твои события:\n{"\n".join(reminders.values())}')
+            await message.answer(f'Твои события:\n{"\n".join(reminders)}')
         else:
             await message.answer(f'У тебя нет активных событий')
     except Exception as e:
         await message.answer(f'При поиске произошёл погром. Повтори попытку позднее')
+
 
 @router.message(Command('delete'))
 async def cmd_delete(message: Message, state: FSMContext):
@@ -123,14 +129,15 @@ async def cmd_delete(message: Message, state: FSMContext):
         await message.answer(f'У тебя нет активных событий')
         await state.clear()
 
+
 @router.message(condition.reminder_delete)
 async def reminder_delete(message: Message, state: FSMContext):
     reminders = await get_id_all_user_reminders(message.chat.id)
     await state.update_data(remind_id=message.text)
     data = await state.get_data()
-    if reminders[data['remind_id'] - 1]:
+    if reminders[int(data['remind_id']) - 1]:
         try:
-            await del_user_reminders(data['remind_id'] - 1)
+            await del_user_reminders(int(data['remind_id']) - 1)
             await message.answer(f'Событие удалено!')
             await state.clear()
         except Exception:
@@ -141,36 +148,38 @@ async def reminder_delete(message: Message, state: FSMContext):
         await state.clear()
 
 
-
-
 @router.message(Command('help'))
 async def cmd_help(message: Message):
     await message.answer(f'{description}', reply_markup=kb)
 
 
-@router.message(F.text == 'Мои события')
+@router.message(F.text.lower() == 'мои события')
 async def btn_events(message: Message):
     await cmd_events(message)
     return
 
-@router.message(F.text == 'Новое событие')
+
+@router.message(F.text.lower() == 'новое событие')
 async def btn_create(message: Message, state: FSMContext):
     await state.set_state(condition.messages)
     await cmd_create(message, state)
     return
 
-@router.message(F.text == 'Помощь')
+
+@router.message(F.text.lower() == 'помощь')
 async def btn_help(message: Message):
     await cmd_help(message)
     return
 
-@router.message(F.text == 'Удалить событие')
-async def btn_delete(message: Message):
 
-    await cmd_delete(message)
+@router.message(F.text.lower() == 'удалить событие')
+async def btn_delete(message: Message, state: FSMContext):
+    await state.set_state(condition.reminder_delete)
+    await cmd_delete(message, state)
     return
 
 
 @router.message(F.text)
 async def cmd_how_are_you(message: Message):
-    await message.answer('К сожалению я пока не умею работать с произвольным текстом, но я учусь ^_^')
+    await message.answer('К сожалению я пока не умею работать с произвольным текстом,'
+                         ' воспользуя командой \U0001F449 /help')
