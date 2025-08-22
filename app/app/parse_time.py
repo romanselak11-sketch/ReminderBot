@@ -2,53 +2,58 @@ import re
 from datetime import datetime, timedelta, time
 from dateutil.relativedelta import relativedelta
 from config import MONTHS, WEEKDAYS
+from logger_config import get_logger
 from re import search
 
+logger = get_logger(__name__)
 
 async def parse_text_in_date(text: str):
     result_date = datetime.now()
     text = text.strip().lower()
     result_time = None
     dd_mm_yyyy = await _parse_dd_mm_yyy(text)
+    hh_mm_ss = await _parse_time(text)
 
     if dd_mm_yyyy:
         return dd_mm_yyyy
 
-    if ' в ' in text:
-        result_time = await _parse_time(text) or time(hour=9, minute=0)
+    if hh_mm_ss:
+        result_time = dd_mm_yyyy or time(hour=result_date.hour, minute=result_date.minute)
 
-    if 'чере' in text:
-        try:
+    try:
+
+        if 'чере' in text:
             result_date = await _parse_in_an_time(text, result_date)
-        except Exception as e:
-            print('Ошибка в через')
 
-    if 'завтра' in text:
-        result_date = (result_date + timedelta(days=1))
+        if 'завтра' in text:
+            result_date = (result_date + timedelta(days=1))
 
-    if 'послезавтра' in text:
-        result_date = (result_date + timedelta(days=2))
+        if 'послезавтра' in text:
+            result_date = (result_date + timedelta(days=2))
 
-    for key, value in MONTHS.items():
-        if key in text:
-            current_month = result_date.month
-            if value >= current_month:
-                result_month = value - current_month
-            else:
-                result_month = (12 - current_month) + value
-            result_date = result_date + relativedelta(months=result_month)
+        for key, value in MONTHS.items():
+            if key in text:
+                current_month = result_date.month
+                if value >= current_month:
+                    result_month = value - current_month
+                else:
+                    result_month = (12 - current_month) + value
+                result_date = result_date + relativedelta(months=result_month)
 
-    for key, value in WEEKDAYS.items():
-        if key in text:
-            delta_days = (value - result_date.weekday()) % 7
-            if delta_days == 0:
-                result_date = result_date
-            else:
-                result_date = result_date + timedelta(days=delta_days)
+        for key, value in WEEKDAYS.items():
+            if key in text:
+                delta_days = (value - result_date.weekday()) % 7
+                if delta_days == 0:
+                    result_date = result_date
+                else:
+                    result_date = result_date + timedelta(days=delta_days)
 
-    if result_time:
-        return datetime.combine(result_date, result_time)
-    return result_date
+        if result_time:
+            return datetime.combine(result_date, result_time)
+        return result_date
+    except Exception as e:
+        logger.error(f'При поиска даты в тексте произошла ошибка: {e}')
+        raise Exception
 
 
 async def _parse_in_an_time(text: str, result_date: datetime):

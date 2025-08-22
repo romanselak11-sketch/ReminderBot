@@ -29,8 +29,8 @@ async def cmd_start(message: Message):
 async def add_timezone(message: Message, state: FSMContext):
     logger.info(f'Пользователь: {message.from_user.id} начал настройку часового пояса')
     await state.set_state(condition.timezone)
-    await message.answer('\U000023F0 Введите ваш часовой пояс в формате: +5:00/+05:00\n\n'
-                         'Пример: Для Москвы и Московской области часовой пояс: +3:00/+03:00',
+    await message.answer('\U000023F0 Введите ваш часовой пояс в формате: +5:00 или +05:00\n\n'
+                         'Пример: Для Москвы и Московской области часовой пояс: +3:00 или +03:00',
                          reply_markup=kb)
 
 
@@ -176,6 +176,14 @@ async def btn_help(message: Message):
 async def btn_delete(message: Message, state: FSMContext):
     await state.set_state(condition.reminder_delete)
     await cmd_delete(message, state)
+    return
+
+
+@router.message(F.text.lower.startswith('напомни'))
+async def remind_my_text(message: Message, state: FSMContext):
+    await state.set_state(condition.reminder_date)
+    await state.update_data(message=message.text[message.text.find('напомни') + 7:], reminder_date=message.text)
+    await add_reminder(message, state)
     return
 
 
