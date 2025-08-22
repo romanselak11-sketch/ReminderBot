@@ -179,7 +179,7 @@ async def btn_delete(message: Message, state: FSMContext):
     return
 
 
-@router.message(F.text.lower.startswith('напомни'))
+@router.message(F.text.lower().startswith('напомни'))
 async def remind_my_text(message: Message, state: FSMContext):
     await state.set_state(condition.reminder_date)
     await state.update_data(message=message.text[message.text.find('напомни') + 7:], reminder_date=message.text)
