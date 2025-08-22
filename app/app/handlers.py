@@ -4,7 +4,7 @@ from aiogram.types import Message, CallbackQuery
 from app.app.keyboards import keyboard as kb
 from app.app.states import ReminderStates
 from aiogram.fsm.context import FSMContext
-from app.app.deferred_task import add_one_reminder_to_scheduler, get_all_user_reminders
+from app.app.deferred_task import add_one_reminder_to_scheduler, get_all_user_reminders, get_id_all_user_reminders, del_user_reminders
 from app.app.parse_time import parse_time_zone, parse_text_in_date
 from app.remind_db.db_excecuter import add_user_to_db, get_user_timezone
 from logger_config import get_logger
@@ -106,15 +106,42 @@ async def cmd_events(message: Message):
     try:
         reminders = await get_all_user_reminders(message.chat.id)
         if reminders:
-            await message.answer(f'Твои события:\n{"\n".join(reminders)}')
+            await message.answer(f'Твои события:\n{"\n".join(reminders.values())}')
         else:
             await message.answer(f'У тебя нет активных событий')
     except Exception as e:
         await message.answer(f'При поиске произошёл погром. Повтори попытку позднее')
 
 @router.message(Command('delete'))
-async def cmd_delete(message: Message):
-    await message.answer(f'Пока не умею\U0001F622')
+async def cmd_delete(message: Message, state: FSMContext):
+    await state.set_state(condition.reminder_delete)
+    reminders = await get_all_user_reminders(message.chat.id)
+    if reminders:
+        await message.answer(f'Введи цифру события, которого необходимо удалить')
+        await message.answer(f'{"\n".join(reminders)}')
+    else:
+        await message.answer(f'У тебя нет активных событий')
+        await state.clear()
+
+@router.message(condition.reminder_delete)
+async def reminder_delete(message: Message, state: FSMContext):
+    reminders = await get_id_all_user_reminders(message.chat.id)
+    await state.update_data(remind_id=message.text)
+    data = await state.get_data()
+    if reminders[data['remind_id'] - 1]:
+        try:
+            await del_user_reminders(data['remind_id'] - 1)
+            await message.answer(f'Событие удалено!')
+            await state.clear()
+        except Exception:
+            await message.answer(f'Упс, не получилось. Повтори попытку позже')
+            await state.clear()
+    else:
+        await message.answer(f'События с таким ID не найдено')
+        await state.clear()
+
+
+
 
 @router.message(Command('help'))
 async def cmd_help(message: Message):

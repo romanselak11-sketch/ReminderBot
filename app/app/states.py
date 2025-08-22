@@ -6,4 +6,5 @@ class ReminderStates(StatesGroup):
     timezone = State()
     messages = State()
     reminder_date = State()
+    reminder_delete = State()
 

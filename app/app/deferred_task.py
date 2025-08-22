@@ -24,8 +24,9 @@ async def get_all_user_reminders(chat_id):
     logger.info(f'Ищем события в планировщике')
     try:
         all_reminders = scheduler.get_jobs()
-        all_user_reminders = [f'\U000023F0 {reminder.args[1]}, Дата: {reminder.next_run_time.strftime('%d.%m.%Y %H:%M')}'
-                              for reminder in all_reminders if str(chat_id) in reminder.id]
+        all_user_reminders = [
+            f'\U000023F0 {key + 1}) Дата: {reminder.next_run_time.strftime('%d.%m.%Y %H:%M')}, Событие: {reminder.args[1]}'
+            for key, reminder in enumerate(all_reminders) if str(chat_id) in reminder.id]
 
         if all_user_reminders:
             return all_user_reminders
@@ -34,3 +35,29 @@ async def get_all_user_reminders(chat_id):
     except Exception as e:
         logger.error(f'При поиске произошла ошибка: {e}')
         raise Exception
+
+
+async def get_id_all_user_reminders(chat_id):
+    logger.info(f'Ищем id событий для пользователя {chat_id}')
+    try:
+        all_reminders = scheduler.get_jobs()
+        all_user_reminders = [reminder.id for reminder in all_reminders if str(chat_id) in reminder.id]
+
+        if all_user_reminders:
+            return all_user_reminders
+        else:
+            return False
+    except Exception as e:
+        logger.error(f'При поиске событий произошла ошибка: {e}')
+        raise Exception
+
+
+async def del_user_reminders(job_id):
+    logger.info(f'Удалячем задачу {job_id}')
+    try:
+        scheduler.remove_job(job_id)
+        return True
+    except Exception as e:
+        logger.error(f'При удалении задачи возникла ошибка: {e}')
+        return False
+

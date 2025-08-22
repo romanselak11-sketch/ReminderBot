@@ -9,11 +9,15 @@ async def parse_text_in_date(text: str):
     result_date = datetime.now()
     text = text.strip().lower()
     result_time = None
+    dd_mm_yyyy = await _parse_dd_mm_yyy(text)
+
+    if dd_mm_yyyy:
+        return dd_mm_yyyy
 
     if ' в ' in text:
         result_time = await _parse_time(text) or time(hour=9, minute=0)
 
-    if 'через' in text:
+    if 'чере' in text:
         try:
             result_date = await _parse_in_an_time(text, result_date)
         except Exception as e:
@@ -41,8 +45,6 @@ async def parse_text_in_date(text: str):
                 result_date = result_date
             else:
                 result_date = result_date + timedelta(days=delta_days)
-
-
 
     if result_time:
         return datetime.combine(result_date, result_time)
@@ -115,6 +117,33 @@ async def _parse_time(text: str):
                 return None
             return time(hour, minute, second=0)
     return None
+
+
+async def _parse_dd_mm_yyy(text: str):
+    pattern = r'\b(\d{2})\.(\d{2})\.(\d{4})\s+(\d{1,2}):(\d{1,2}):(\d{1,2})\b'
+    parsed = search(pattern, text)
+    if parsed:
+        day = parsed.group(1)
+        if int(day) > 31 or int(day) < 1:
+            return False
+        month = parsed.group(2)
+        if int(month) > 12 or int(month) < 1:
+            return False
+        year = parsed.group(3)
+        if int(year) < datetime.now().year or int(year) > 9999:
+            return False
+        hour = parsed.group(4)
+        if int(hour) < 0 or int(hour) > 23:
+            return False
+        minute = parsed.group(5)
+        if int(minute) < 0 or int(minute) > 59:
+            return False
+        second = parsed.group(6)
+        if int(second) < 1 or int(second) > 59:
+            return False
+        return datetime(int(year), int(month), int(day), int(hour), int(minute), int(second))
+    else:
+        return False
 
 
 async def parse_time_zone(text: str):
