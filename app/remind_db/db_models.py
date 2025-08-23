@@ -22,6 +22,7 @@ class Reminder(Base):
     reminder_message = Column(String, index=True)
     reminder_date = Column(DateTime, index=True)
     time_zone = Column(Integer, index=True)
+    reminder_id = Column(String, index=True)
 
 
 

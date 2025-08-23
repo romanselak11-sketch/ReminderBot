@@ -7,7 +7,7 @@ from aiogram.fsm.context import FSMContext
 from app.app.deferred_task import (add_one_reminder_to_scheduler, get_all_user_reminders,
                                    get_id_all_user_reminders, del_user_reminders)
 from app.app.parse_time import parse_time_zone, parse_text_in_date
-from app.remind_db.db_excecuter import add_user_to_db, get_user_timezone
+from app.remind_db.db_excecuter import add_user_to_db, get_user_timezone, add_reminder
 from logger_config import get_logger
 from app.app.help import description
 
@@ -94,7 +94,8 @@ async def add_reminder(message: Message, state: FSMContext):
                                  f'Настрой свой часовой пояс тут \U0001F449 /timezone и повтори поптыку')
             await state.clear()
         else:
-            logger.info('Добавляем событие в очередь')
+            logger.info('Добавляем событие в очередь>')
+            await add_reminder(message.chat.id, time_zone, data['message'], parse_date)
             await add_one_reminder_to_scheduler(data['message'], parse_date, message.chat.id, time_zone)
             await message.answer(f'\U0001FAF0 Событие добавлено!')
             logger.info('Событие добавлено')

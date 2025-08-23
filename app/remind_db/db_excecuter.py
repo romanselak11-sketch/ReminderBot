@@ -82,7 +82,8 @@ async def add_reminder(tg_user_id, time_zone, message, reminder_date):
                 tg_user_id=tg_user_id,
                 time_zone=time_zone,
                 reminder_message=message,
-                reminder_date=reminder_date
+                reminder_date=reminder_date,
+                reminder_id=f'{tg_user_id}_to_{reminder_date}'
             )
             db.add(event)
             await db.commit()
@@ -91,6 +92,25 @@ async def add_reminder(tg_user_id, time_zone, message, reminder_date):
         except Exception as e:
             await db.rollback()
             logger.error(f'Ошибка при записи события: {e}')
+
+
+async def del_reminder(reminder_id):
+    async with AsyncSession(reminder.get_engine()) as db:
+        try:
+            logger.info(f'Ищем событие дял удаления')
+            result_select = await db.execute(select(Reminder).filter(Reminder.reminder_id == reminder_id))
+            event = result_select.scalar_one_or_none()
+            if event:
+                logger.info(f'Удаляем событие: {reminder_id}')
+                await db.delete(event)
+                await db.commit()
+                return True
+            return False
+        except Exception as e:
+            logger.error(f'При удалении события произошла ошибка {e}')
+            await db.rollback()
+            return False
+
 
 
 async def get_all_users():
