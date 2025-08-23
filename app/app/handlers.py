@@ -7,7 +7,7 @@ from aiogram.fsm.context import FSMContext
 from app.app.deferred_task import (add_one_reminder_to_scheduler, get_all_user_reminders,
                                    get_id_all_user_reminders, del_user_reminders)
 from app.app.parse_time import parse_time_zone, parse_text_in_date
-from app.remind_db.db_excecuter import add_user_to_db, get_user_timezone, add_reminder
+from app.remind_db.db_excecuter import add_user_to_db, get_user_timezone, add_reminder_to_db
 from logger_config import get_logger
 from app.app.help import description
 
@@ -47,7 +47,7 @@ async def add_timezone_to_db(message: Message, state: FSMContext):
     else:
         try:
             logger.info(f'Сохраняем для пользователя {message.from_user.id}, часовой пояс: {time_zone}')
-            await add_user_to_db(message.from_user.id,time_zone)
+            await add_user_to_db(message.from_user.id, time_zone)
             await message.answer(f'\U0001F44C Часовой пояс сохранён!\n\n'
                                  f'Для создания события ткни \U0001F449 /create или "Новое событие" \U0001F447', reply_markup=kb)
         except Exception:
@@ -95,7 +95,7 @@ async def add_reminder(message: Message, state: FSMContext):
             await state.clear()
         else:
             logger.info('Добавляем событие в очередь>')
-            await add_reminder(message.chat.id, time_zone, data['message'], parse_date)
+            await add_reminder_to_db(message.chat.id, time_zone, data['message'], parse_date)
             await add_one_reminder_to_scheduler(data['message'], parse_date, message.chat.id, time_zone)
             await message.answer(f'\U0001FAF0 Событие добавлено!')
             logger.info('Событие добавлено')

@@ -74,7 +74,7 @@ async def get_user_reminder(tg_user_id):
                 return False
 
 
-async def add_reminder(tg_user_id, time_zone, message, reminder_date):
+async def add_reminder_to_db(tg_user_id, time_zone, message, reminder_date):
     async with AsyncSession(reminder.get_engine()) as db:
         try:
             logger.info('Записываем событие в БД')
