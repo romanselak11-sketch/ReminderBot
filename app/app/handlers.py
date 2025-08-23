@@ -123,7 +123,7 @@ async def cmd_delete(message: Message, state: FSMContext):
     await state.set_state(condition.reminder_delete)
     reminders = await get_all_user_reminders(message.chat.id)
     if reminders:
-        await message.answer(f'Введи цифру события, которого необходимо удалить')
+        await message.answer(f'Введи порядковый номер события, которого необходимо удалить')
         await message.answer(f'{"\n".join(reminders)}')
     else:
         await message.answer(f'У тебя нет активных событий')
@@ -134,10 +134,11 @@ async def cmd_delete(message: Message, state: FSMContext):
 async def reminder_delete(message: Message, state: FSMContext):
     reminders = await get_id_all_user_reminders(message.chat.id)
     await state.update_data(remind_id=message.text)
+
     data = await state.get_data()
     if reminders[int(data['remind_id']) - 1]:
         try:
-            await del_user_reminders(int(data['remind_id']) - 1)
+            await del_user_reminders(reminders[int(data['remind_id']) - 1])
             await message.answer(f'Событие удалено!')
             await state.clear()
         except Exception:
@@ -182,7 +183,7 @@ async def btn_delete(message: Message, state: FSMContext):
 @router.message(F.text.lower().startswith('напомни'))
 async def remind_my_text(message: Message, state: FSMContext):
     await state.set_state(condition.reminder_date)
-    await state.update_data(message=message.text[message.text.find('напомни') + 7:], reminder_date=message.text)
+    await state.update_data(message=message.text[message.text.find('напомни') + 8:], reminder_date=message.text)
     await add_reminder(message, state)
     return
 

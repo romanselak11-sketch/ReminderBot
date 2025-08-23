@@ -38,7 +38,7 @@ async def get_all_user_reminders(chat_id):
 
 
 async def get_id_all_user_reminders(chat_id):
-    logger.info(f'Ищем id событий для пользователя {chat_id}')
+    logger.info(f'Ищем id события для пользователя {chat_id}')
     try:
         all_reminders = scheduler.get_jobs()
         all_user_reminders = [reminder.id for reminder in all_reminders if str(chat_id) in reminder.id]
