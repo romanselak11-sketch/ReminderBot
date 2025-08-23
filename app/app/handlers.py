@@ -1,6 +1,6 @@
 from aiogram import F, Router
 from aiogram.filters import CommandStart, Command
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message
 from app.app.keyboards import keyboard as kb
 from app.app.states import ReminderStates
 from aiogram.fsm.context import FSMContext
