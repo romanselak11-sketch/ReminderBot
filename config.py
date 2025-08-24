@@ -16,8 +16,10 @@ DB_PORT = os.environ.get('DB_PORT')
 DB_NAME = os.environ.get('DB_NAME')
 API_TOKEN = os.environ.get('API_TOKEN')
 
+
 def get_async_database_url():
     return f'postgresql+asyncpg://{DB_USERNAME}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}'
+
 
 def get_sync_database_url():
     return f'postgresql://{DB_USERNAME}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}'
@@ -25,7 +27,6 @@ def get_sync_database_url():
 
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
-
 
 
 scheduler = AsyncIOScheduler()
@@ -55,3 +56,4 @@ WEEKDAYS = {
     'суббота': 5,
     'воскресенье': 6,
 }
+

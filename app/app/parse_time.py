@@ -8,7 +8,7 @@ from re import search
 logger = get_logger(__name__)
 
 async def parse_text_in_date(text: str):
-    result_date = datetime.now()
+    result_date, current_date = datetime.now()
     text = text.strip().lower()
     result_time = None
     dd_mm_yyyy = await _parse_dd_mm_yyy(text)
@@ -18,11 +18,14 @@ async def parse_text_in_date(text: str):
         return dd_mm_yyyy
 
     if hh_mm_ss:
-        result_time = dd_mm_yyyy or time(hour=result_date.hour, minute=result_date.minute)
+        result_time = hh_mm_ss or time(hour=result_date.hour, minute=result_date.minute)
 
     try:
 
         if 'чере' in text:
+            result_date = await _parse_in_an_time(text, result_date)
+
+        if 'в' in text:
             result_date = await _parse_in_an_time(text, result_date)
 
         if 'завтра' in text:
@@ -50,10 +53,13 @@ async def parse_text_in_date(text: str):
 
         if result_time:
             return datetime.combine(result_date, result_time)
-        return result_date
+        if current_date != result_date:
+            return result_date
+        else:
+            raise Exception('Не удалось распознать дату')
     except Exception as e:
         logger.error(f'При поиска даты в тексте произошла ошибка: {e}')
-        raise Exception
+        raise Exception('Не удалось распознать дату')
 
 
 async def _parse_in_an_time(text: str, result_date: datetime):
@@ -65,14 +71,14 @@ async def _parse_in_an_time(text: str, result_date: datetime):
             result_date = (result_date + timedelta(days=1))
 
     if 'недел' in text:
-        numbers = search(r'через\s+(\d+)\s*(неделю|недели|недель)', text)
+        numbers = search(r'через\s+(\d+)\s*(неделю|недели|недель|нед)', text)
         try:
             result_date = (result_date + timedelta(weeks=int(numbers.group(1))))
         except AttributeError:
             result_date = (result_date + timedelta(weeks=1))
 
     if 'месяц' in text:
-        numbers = search(r'через\s+(\d+)\s*(месяц|месяца|месяцев)', text)
+        numbers = search(r'через\s+(\d+)\s*(месяц|месяца|месяцев|мес)', text)
         try:
             result_date = (result_date + relativedelta(months=int(numbers.group(1))))
         except AttributeError:
@@ -93,14 +99,14 @@ async def _parse_in_an_time(text: str, result_date: datetime):
             result_date = (result_date + timedelta(hours=1))
 
     if 'минут' in text:
-        numbers = search(r'через\s+(\d+)\s*(минут|минуты|минуту)', text)
+        numbers = search(r'через\s+(\d+)\s*(минут|минуты|минуту|мин)', text)
         try:
             result_date = (result_date + timedelta(minutes=int(numbers.group(1))))
         except AttributeError:
             result_date = (result_date + timedelta(minutes=1))
 
     if 'секунд' in text:
-        numbers = search(r'через\s+(\d+)\s*(секунд|секунды|секунду)', text)
+        numbers = search(r'через\s+(\d+)\s*(секунд|секунды|секунду|сек)', text)
         try:
             result_date = (result_date + timedelta(seconds=int(numbers.group(1))))
         except AttributeError:

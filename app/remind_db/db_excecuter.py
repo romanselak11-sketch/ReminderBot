@@ -29,7 +29,6 @@ async def add_user_to_db(tg_user_id, time_zone):
                 mg_user_reminder = await db.merge(user_reminder)
             await db.commit()
             await db.refresh(mg_user_reminder)
-
             return mg_user_reminder
 
         except Exception as e:
@@ -46,6 +45,7 @@ async def get_user_timezone(tg_user_id):
                 result_select = await db.execute(select(User.time_zone).filter(User.tg_user_id == tg_user_id))
                 time_zone = result_select.scalar_one_or_none()
                 logger.info(f'Временная зона найдена: {time_zone}')
+                reminder.close_engine()
                 return time_zone
             except Exception as e:
                 logger.info(f'Попытка соединения: {attempt + 1}, Не удалось подключиться, переподключаемся')
