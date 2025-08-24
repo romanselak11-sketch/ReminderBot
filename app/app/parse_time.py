@@ -39,7 +39,7 @@ async def parse_text_in_date(text: str):
     try:
 
         if 'чере' in change_text.text:
-            result_date = await _parse_in_an_time(change_text.text, result_date)
+            result_date = await _parse_in_an_time(result_date)
 
         if 'сегодня' in change_text.text:
             result_date = (result_date + timedelta(days=0))
@@ -73,7 +73,7 @@ async def parse_text_in_date(text: str):
                 else:
                     result_date = result_date + timedelta(days=delta_days)
 
-        result_date = await _parse_in_an_time(change_text.text, result_date)
+        result_date = await _parse_in_an_time(result_date)
 
         if result_time:
             logger.info(f'Результат: {datetime.combine(result_date, result_time)}')
@@ -88,67 +88,67 @@ async def parse_text_in_date(text: str):
         raise Exception('Не удалось распознать дату')
 
 
-async def _parse_in_an_time(text: str, result_date: datetime):
-    if 'день' in text or 'дня' in text or 'дней' in text:
+async def _parse_in_an_time(result_date: datetime):
+    if 'день' in change_text.text or 'дня' in change_text.text or 'дней' in change_text.text:
         pattern = r'через\s+(\d+)\s*(день|дня|дней)'
-        number = search(pattern, text)
+        number = search(pattern, change_text.text)
         try:
             result_date = (result_date + timedelta(days=int(number.group(1))))
-            change_text.update_text(text, pattern)
+            change_text.update_text(change_text.text, pattern)
         except AttributeError:
             result_date = (result_date + timedelta(days=1))
 
-    if 'недел' in text:
+    if 'недел' in change_text.text:
         pattern = r'через\s+(\d+)\s*(неделю|недели|недель|нед)'
-        numbers = search(pattern, text)
+        numbers = search(pattern, change_text.text)
         try:
             result_date = (result_date + timedelta(weeks=int(numbers.group(1))))
-            change_text.update_text(text, pattern)
+            change_text.update_text(change_text.text, pattern)
         except AttributeError:
             result_date = (result_date + timedelta(weeks=1))
 
-    if 'месяц' in text:
+    if 'месяц' in change_text.text:
         pattern = r'через\s+(\d+)\s*(месяц|месяца|месяцев|мес)'
-        numbers = search(pattern, text)
+        numbers = search(pattern, change_text.text)
         try:
             result_date = (result_date + relativedelta(months=int(numbers.group(1))))
-            change_text.update_text(text, pattern)
+            change_text.update_text(change_text.text, pattern)
         except AttributeError:
             result_date = (result_date + relativedelta(months=1))
 
-    if 'год' in text:
+    if 'год' in change_text.text:
         pattern = r'\s+(\d+)\s*(год|года|лет)'
-        numbers = search(pattern, text)
+        numbers = search(pattern, change_text.text)
         try:
             result_date = (result_date + relativedelta(years=int(numbers.group(1))))
-            change_text.update_text(text, pattern)
+            change_text.update_text(change_text.text, pattern)
         except AttributeError:
             result_date = (result_date + relativedelta(years=1))
 
-    if 'час' in text:
+    if 'час' in change_text.text:
         pattern = r'через\s+(\d+)\s*(час|часа|часов)'
-        numbers = search(pattern, text)
+        numbers = search(pattern, change_text.text)
         try:
             result_date = (result_date + timedelta(hours=int(numbers.group(1))))
-            change_text.update_text(text, pattern)
+            change_text.update_text(change_text.text, pattern)
         except AttributeError:
             result_date = (result_date + timedelta(hours=1))
 
-    if 'минут' in text:
+    if 'минут' in change_text.text:
         pattern = r'через\s+(\d+)\s*(минут|минуты|минуту|мин)'
-        numbers = search(pattern, text)
+        numbers = search(pattern, change_text.text)
         try:
             result_date = (result_date + timedelta(minutes=int(numbers.group(1))))
-            change_text.update_text(text, pattern)
+            change_text.update_text(change_text.text, pattern)
         except AttributeError:
             result_date = (result_date + timedelta(minutes=1))
 
-    if 'секунд' in text:
+    if 'секунд' in change_text.text:
         pattern = r'через\s+(\d+)\s*(секунд|секунды|секунду|сек)'
-        numbers = search(pattern, text)
+        numbers = search(pattern, change_text.text)
         try:
             result_date = (result_date + timedelta(seconds=int(numbers.group(1))))
-            change_text.update_text(text, pattern)
+            change_text.update_text(change_text.text, pattern)
         except AttributeError:
             result_date = (result_date + timedelta(seconds=1))
     return result_date
