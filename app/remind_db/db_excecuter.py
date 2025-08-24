@@ -45,11 +45,11 @@ async def get_user_timezone(tg_user_id):
                 result_select = await db.execute(select(User.time_zone).filter(User.tg_user_id == tg_user_id))
                 time_zone = result_select.scalar_one_or_none()
                 logger.info(f'Временная зона найдена: {time_zone}')
-                reminder.close_engine()
+                await reminder.close_engine()
                 return time_zone
             except Exception as e:
                 logger.info(f'Попытка соединения: {attempt + 1}, Не удалось подключиться, переподключаемся')
-                reminder.close_engine()
+                await reminder.close_engine()
                 if attempt == max_attempts - 1:
                     logger.error(f'Не удалось подключиться к базе. Количество попыток: {attempt}, ошибка: {e}')
                 return False
@@ -69,7 +69,7 @@ async def get_user_reminder(tg_user_id):
                 return []
         except Exception as e:
             logger.error(f'При поиске событий произошла ошибка: {e}')
-            reminder.close_engine()
+            await reminder.close_engine()
             if attempt == max_attempts - 1:
                 logger.error(f'Не удалось подключиться к базе. Количество попыток: {attempt}, ошибка: {e}')
                 return []
@@ -98,7 +98,7 @@ async def add_reminder_to_db(tg_user_id, time_zone, message, reminder_date):
 async def del_reminder(reminder_id):
     async with AsyncSession(reminder.get_engine()) as db:
         try:
-            logger.info(f'Ищем событие дял удаления')
+            logger.info(f'Ищем событие для удаления')
             result_select = await db.execute(select(Reminder).filter(Reminder.reminder_id == reminder_id))
             event = result_select.scalar_one_or_none()
             if event:
@@ -127,7 +127,7 @@ async def get_all_users():
                     return []
         except Exception as e:
             logger.error(f'При поиске пользователей произошла ошибка: {e}')
-            reminder.close_engine()
+            await reminder.close_engine()
             if attempt == max_attempts - 1:
                 logger.error(f'Не удалось подключиться к базе. Количество попыток: {attempt}, ошибка: {e}')
                 return []

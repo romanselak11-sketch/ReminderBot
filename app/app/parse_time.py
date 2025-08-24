@@ -7,12 +7,28 @@ from re import search
 
 logger = get_logger(__name__)
 
+
+class ChangeText:
+    def __init__(self, text=None):
+        self.text = text
+
+    def get_text(self):
+        return self.text
+
+    def update_text(self, text, pattern=None):
+        parsed = search(pattern, self.text)
+        self.text = self.text[:parsed.start() - 1] + text[parsed.end():]
+
+
+change_text = ChangeText()
+
+
 async def parse_text_in_date(text: str):
-    result_date, current_date = datetime.now()
-    text = text.strip().lower()
+    result_date, current_date = datetime.now(), datetime.now()
+    change_text.text = text.strip().lower()
     result_time = None
-    dd_mm_yyyy = await _parse_dd_mm_yyy(text)
-    hh_mm_ss = await _parse_time(text)
+    dd_mm_yyyy = await _parse_dd_mm_yyy(change_text.text)
+    hh_mm_ss = await _parse_time(change_text.text)
 
     if dd_mm_yyyy:
         return dd_mm_yyyy
@@ -22,21 +38,26 @@ async def parse_text_in_date(text: str):
 
     try:
 
-        if 'чере' in text:
-            result_date = await _parse_in_an_time(text, result_date)
+        if 'чере' in change_text.text:
+            result_date = await _parse_in_an_time(change_text.text, result_date)
 
-        if 'в' in text:
-            result_date = await _parse_in_an_time(text, result_date)
+        if 'сегодня' in change_text.text:
+            result_date = (result_date + timedelta(days=0))
+            change_text.update_text(change_text.text, r'\bсегодня\b')
+            logger.info(f'текст: {change_text.text}')
 
-        if 'завтра' in text:
+        if 'завтра' in change_text.text:
             result_date = (result_date + timedelta(days=1))
+            change_text.update_text(change_text.text, r'\bзавтра\b')
 
-        if 'послезавтра' in text:
+        if 'послезавтра' in change_text.text:
             result_date = (result_date + timedelta(days=2))
+            change_text.update_text(change_text.text, r'\bпослезавтра\b')
 
         for key, value in MONTHS.items():
             if key in text:
                 current_month = result_date.month
+                change_text.update_text(change_text.text, key)
                 if value >= current_month:
                     result_month = value - current_month
                 else:
@@ -46,13 +67,18 @@ async def parse_text_in_date(text: str):
         for key, value in WEEKDAYS.items():
             if key in text:
                 delta_days = (value - result_date.weekday()) % 7
+                change_text.update_text(change_text.text, key)
                 if delta_days == 0:
                     result_date = result_date
                 else:
                     result_date = result_date + timedelta(days=delta_days)
 
+        result_date = await _parse_in_an_time(change_text.text, result_date)
+
         if result_time:
+            logger.info(f'Результат: {datetime.combine(result_date, result_time)}')
             return datetime.combine(result_date, result_time)
+
         if current_date != result_date:
             return result_date
         else:
@@ -64,58 +90,73 @@ async def parse_text_in_date(text: str):
 
 async def _parse_in_an_time(text: str, result_date: datetime):
     if 'день' in text or 'дня' in text or 'дней' in text:
-        number = search(r'через\s+(\d+)\s*(день|дня|дней)', text)
+        pattern = r'через\s+(\d+)\s*(день|дня|дней)'
+        number = search(pattern, text)
         try:
             result_date = (result_date + timedelta(days=int(number.group(1))))
+            change_text.update_text(text, pattern)
         except AttributeError:
             result_date = (result_date + timedelta(days=1))
 
     if 'недел' in text:
-        numbers = search(r'через\s+(\d+)\s*(неделю|недели|недель|нед)', text)
+        pattern = r'через\s+(\d+)\s*(неделю|недели|недель|нед)'
+        numbers = search(pattern, text)
         try:
             result_date = (result_date + timedelta(weeks=int(numbers.group(1))))
+            change_text.update_text(text, pattern)
         except AttributeError:
             result_date = (result_date + timedelta(weeks=1))
 
     if 'месяц' in text:
-        numbers = search(r'через\s+(\d+)\s*(месяц|месяца|месяцев|мес)', text)
+        pattern = r'через\s+(\d+)\s*(месяц|месяца|месяцев|мес)'
+        numbers = search(pattern, text)
         try:
             result_date = (result_date + relativedelta(months=int(numbers.group(1))))
+            change_text.update_text(text, pattern)
         except AttributeError:
             result_date = (result_date + relativedelta(months=1))
 
     if 'год' in text:
-        numbers = search(r'\s+(\d+)\s*(год|года|лет)', text)
+        pattern = r'\s+(\d+)\s*(год|года|лет)'
+        numbers = search(pattern, text)
         try:
             result_date = (result_date + relativedelta(years=int(numbers.group(1))))
+            change_text.update_text(text, pattern)
         except AttributeError:
             result_date = (result_date + relativedelta(years=1))
 
     if 'час' in text:
-        numbers = search(r'через\s+(\d+)\s*(час|часа|часов)', text)
+        pattern = r'через\s+(\d+)\s*(час|часа|часов)'
+        numbers = search(pattern, text)
         try:
             result_date = (result_date + timedelta(hours=int(numbers.group(1))))
+            change_text.update_text(text, pattern)
         except AttributeError:
             result_date = (result_date + timedelta(hours=1))
 
     if 'минут' in text:
-        numbers = search(r'через\s+(\d+)\s*(минут|минуты|минуту|мин)', text)
+        pattern = r'через\s+(\d+)\s*(минут|минуты|минуту|мин)'
+        numbers = search(pattern, text)
         try:
             result_date = (result_date + timedelta(minutes=int(numbers.group(1))))
+            change_text.update_text(text, pattern)
         except AttributeError:
             result_date = (result_date + timedelta(minutes=1))
 
     if 'секунд' in text:
-        numbers = search(r'через\s+(\d+)\s*(секунд|секунды|секунду|сек)', text)
+        pattern = r'через\s+(\d+)\s*(секунд|секунды|секунду|сек)'
+        numbers = search(pattern, text)
         try:
             result_date = (result_date + timedelta(seconds=int(numbers.group(1))))
+            change_text.update_text(text, pattern)
         except AttributeError:
             result_date = (result_date + timedelta(seconds=1))
     return result_date
 
 
 async def _parse_time(text: str):
-    times = search(r'(?:\bв\s+|\bво\s+)(\d{1,2})[:.,]?(\d{0,2})', text)
+    pattern = r'(?:\bв?\s+|\bво\s+)(\d{2})[:.,]?(\d{2})'
+    times = search(pattern, text)
     if times:
         hour = int(times.group(1))
         minute = int(times.group(2)) if times.group(2) else 0
@@ -126,6 +167,7 @@ async def _parse_time(text: str):
             minute = minute % 60
             if hour >= 24:
                 return None
+            change_text.update_text(text, pattern)
             return time(hour, minute, second=0)
     return None
 
@@ -152,6 +194,7 @@ async def _parse_dd_mm_yyy(text: str):
         second = parsed.group(6)
         if int(second) < 1 or int(second) > 59:
             return False
+        change_text.update_text(text, pattern)
         return datetime(int(year), int(month), int(day), int(hour), int(minute), int(second))
     else:
         return False
@@ -175,7 +218,3 @@ async def parse_time_zone(text: str):
             return total_minutes if sign == '+' else -total_minutes
     except Exception:
         return False
-
-
-
-

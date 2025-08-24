@@ -27,9 +27,6 @@ class ReminderDB:
             logger.error(f"БД уже создана или возникла ошибка при создании: {e}")
             pass
 
-    def __del__(self):
-        self.close_engine()
-
     def get_engine(self):
         if self._engine is None:
             self._engine = create_async_engine(
@@ -41,15 +38,12 @@ class ReminderDB:
                 pool_timeout=30,)
         return self._engine
 
-    def close_engine(self):
+    async def close_engine(self):
         if self._engine:
             try:
-                self._engine.dispose()
+                await self._engine.dispose()
             except Exception as e:
                 logger.error(f'Ошибка при закрытии соединения: {e}')
             finally:
                 self._engine = None
-
-
-
 
