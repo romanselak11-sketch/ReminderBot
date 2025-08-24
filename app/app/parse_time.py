@@ -102,7 +102,7 @@ async def _parse_in_an_time(text: str, result_date: datetime):
     if 'секунд' in text:
         numbers = search(r'через\s+(\d+)\s*(секунд|секунды|секунду)', text)
         try:
-            result_date = (result_date + timedelta(seconds=int(numbers.group())))
+            result_date = (result_date + timedelta(seconds=int(numbers.group(1))))
         except AttributeError:
             result_date = (result_date + timedelta(seconds=1))
     return result_date
@@ -152,20 +152,23 @@ async def _parse_dd_mm_yyy(text: str):
 
 
 async def parse_time_zone(text: str):
-    timezone = search(r'^[+-]\d{1,2}[:.]\d{2}$', text.strip())
-    if not timezone:
-        return False
-    else:
-        sign = text[0]
-        hours = int(re.split(r'[:.]', text[1:])[0])
-        minutes = int(re.split(r'[:.]', text[1:])[1])
-
-        if hours < 0 or hours > 23 or minutes < 0 or minutes > 59:
+    try:
+        timezone = search(r'^[+-]\d{1,2}[:.]\d{2}$', text.strip())
+        if not timezone:
             return False
+        else:
+            sign = text[0]
+            hours = int(re.split(r'[:.]', text[1:])[0])
+            minutes = int(re.split(r'[:.]', text[1:])[1])
 
-        total_minutes = hours * 60 + minutes
+            if hours < 0 or hours > 23 or minutes < 0 or minutes > 59:
+                return False
 
-        return total_minutes if sign == '+' else -total_minutes
+            total_minutes = hours * 60 + minutes
+
+            return total_minutes if sign == '+' else -total_minutes
+    except Exception:
+        return False
 
 
 

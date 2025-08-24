@@ -7,7 +7,7 @@ from aiogram.fsm.context import FSMContext
 from app.app.deferred_task import (add_one_reminder_to_scheduler, get_all_user_reminders,
                                    get_id_all_user_reminders, del_user_reminders)
 from app.app.parse_time import parse_time_zone, parse_text_in_date
-from app.remind_db.db_excecuter import add_user_to_db, get_user_timezone, add_reminder_to_db
+from app.remind_db.db_excecuter import add_user_to_db, get_user_timezone, del_reminder
 from logger_config import get_logger
 from app.app.help import description
 
@@ -95,7 +95,6 @@ async def add_reminder(message: Message, state: FSMContext):
             await state.clear()
         else:
             logger.info('Добавляем событие в очередь>')
-            await add_reminder_to_db(message.chat.id, time_zone, data['message'], parse_date)
             await add_one_reminder_to_scheduler(data['message'], parse_date, message.chat.id, time_zone)
             await message.answer(f'\U0001FAF0 Событие добавлено!')
             logger.info('Событие добавлено')
@@ -140,6 +139,7 @@ async def reminder_delete(message: Message, state: FSMContext):
     if reminders[int(data['remind_id']) - 1]:
         try:
             await del_user_reminders(reminders[int(data['remind_id']) - 1])
+            await del_reminder(reminders[int(data['remind_id']) - 1])
             await message.answer(f'Событие удалено!')
             await state.clear()
         except Exception:

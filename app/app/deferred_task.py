@@ -2,6 +2,7 @@ from pytz import FixedOffset
 from config import scheduler
 from app.app.response_handlers import user_response
 from logger_config import get_logger
+from app.remind_db.db_excecuter import add_reminder_to_db
 
 logger = get_logger(__name__)
 
@@ -10,15 +11,21 @@ async def add_one_reminder_to_scheduler(message, reminder_date, chat_id, time_zo
     tz = FixedOffset(time_zone)
     reminder_date = tz.localize(reminder_date)
     try:
+        try:
+            await add_reminder_to_db(chat_id, time_zone, message, reminder_date)
+        except Exception as e:
+            logger.error(f'При записи в Бд произошла ошибкка: {e}')
+
         scheduler.add_job(
             func=user_response,
             trigger='date',
             run_date=reminder_date,
-            args=(chat_id, message),
+            args=(chat_id, message, f'{chat_id}_to_{reminder_date}'),
             id=f'{chat_id}_to_{reminder_date}')
 
     except Exception as e:
         logger.info(f'При добавлении напоминания, произошла ошибка: {e}')
+        return Exception
 
 async def get_all_user_reminders(chat_id):
     logger.info(f'Ищем события в планировщике')

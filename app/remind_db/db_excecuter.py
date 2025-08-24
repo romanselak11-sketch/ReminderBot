@@ -1,3 +1,4 @@
+import pytz
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from ..remind_db.db_connect import ReminderDB
@@ -61,17 +62,17 @@ async def get_user_reminder(tg_user_id):
             async with AsyncSession(reminder.get_engine()) as db:
                 logger.info(f'Ищем события пользователя')
                 result_select = await db.execute(select(Reminder).filter(Reminder.tg_user_id == tg_user_id))
-                events = result_select.scalar_one_or_none()
+                events = result_select.scalars().all()
                 if events:
-                    return events
-                else:
-                    return False
+                    return [(event.reminder_message, event.reminder_date,
+                             event.tg_user_id, event.time_zone, event.reminder_id) for event in events]
+                return []
         except Exception as e:
             logger.error(f'При поиске событий произошла ошибка: {e}')
             reminder.close_engine()
             if attempt == max_attempts - 1:
                 logger.error(f'Не удалось подключиться к базе. Количество попыток: {attempt}, ошибка: {e}')
-                return False
+                return []
 
 
 async def add_reminder_to_db(tg_user_id, time_zone, message, reminder_date):
@@ -82,7 +83,7 @@ async def add_reminder_to_db(tg_user_id, time_zone, message, reminder_date):
                 tg_user_id=tg_user_id,
                 time_zone=time_zone,
                 reminder_message=message,
-                reminder_date=reminder_date,
+                reminder_date=reminder_date.replace(tzinfo=None),
                 reminder_id=f'{tg_user_id}_to_{reminder_date}'
             )
             db.add(event)
@@ -112,7 +113,6 @@ async def del_reminder(reminder_id):
             return False
 
 
-
 async def get_all_users():
     max_attempts = 3
     for attempt in range(max_attempts):
@@ -120,14 +120,14 @@ async def get_all_users():
             async with AsyncSession(reminder.get_engine()) as db:
                 logger.info(f'Ищем пользователей')
                 result_select = await db.execute(select(User))
-                users = result_select.scalar_one_or_none()
+                users = [user.tg_user_id for user in result_select.scalars().all()]
                 if users:
                     return users
                 else:
-                    return False
+                    return []
         except Exception as e:
             logger.error(f'При поиске пользователей произошла ошибка: {e}')
             reminder.close_engine()
             if attempt == max_attempts - 1:
                 logger.error(f'Не удалось подключиться к базе. Количество попыток: {attempt}, ошибка: {e}')
-            return False
+                return []
