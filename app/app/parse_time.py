@@ -1,9 +1,10 @@
-import re
 from datetime import datetime, timedelta, time
 from dateutil.relativedelta import relativedelta
 from config import MONTHS, WEEKDAYS
 from logger_config import get_logger
-from re import search
+from re import search, split
+from pytz import FixedOffset
+from apscheduler.triggers.cron import CronTrigger
 
 logger = get_logger(__name__)
 
@@ -227,8 +228,8 @@ async def parse_time_zone(text: str):
             return False
         else:
             sign = text[0]
-            hours = int(re.split(r'[:.]', text[1:])[0])
-            minutes = int(re.split(r'[:.]', text[1:])[1])
+            hours = int(split(r'[:.]', text[1:])[0])
+            minutes = int(split(r'[:.]', text[1:])[1])
 
             if hours < 0 or hours > 23 or minutes < 0 or minutes > 59:
                 return False
@@ -238,3 +239,129 @@ async def parse_time_zone(text: str):
             return total_minutes if sign == '+' else -total_minutes
     except Exception:
         return False
+
+
+async def corn_trigger(time_zone, text: str):
+    _year = ''
+    _month = ''
+    _week = ''
+    _day = ''
+    _day_of_week = ''
+    _hour = ''
+    _minute = ''
+    _second = ''
+    _timezone = time_zone
+
+
+
+    '''
+    Каждый/Определенный
+    год/месяц/неделю/день/час/минуту/секунду
+    
+    каждый год 7 марта в 15:00
+    
+    25 числа каждого месяца
+    
+    каждый понедельник в 8:00
+    
+    в рабочие дни с 8-17 каждый час
+    
+    каждую 3ью неделю в 10 часов 40 минут
+    '''
+    pass
+
+
+async def interval_trigger(time_zone, text):
+    _weekday = 0
+    _day = 0
+    _hour = 0
+    _minute = 0
+    _second = 0
+    _start_date = datetime.now()
+    _time_zone = FixedOffset(time_zone)
+    change_text.text = text
+
+    try:
+        if 'недел' in change_text.text:
+            pattern = r'\s*(\d*)\s*(неделю|недели|недель|нед)'
+            numbers = search(pattern, change_text.text)
+            try:
+                if numbers.group(1) == '':
+                    _weekday = 1
+                else:
+                    _weekday = int(numbers.group(1))
+                change_text.update_text(change_text.text, pattern)
+            except AttributeError:
+                _weekday = 1
+
+        if 'день' in change_text.text or 'дня' in change_text.text or 'дней' in change_text.text:
+            pattern = r'\s*(\d*)\s*(день|дня|дней)'
+            numbers = search(pattern, change_text.text)
+            try:
+                if numbers.group(1) == '':
+                    _day = 1
+                else:
+                    _day = int(numbers.group(1))
+                change_text.update_text(change_text.text, pattern)
+            except AttributeError:
+                _day = 1
+
+        if 'час' in change_text.text:
+            pattern = r'\s*(\d*)\s*(час|часа|часов)'
+            numbers = search(pattern, change_text.text)
+            try:
+                if numbers.group(1) == '':
+                    _hour = 1
+                else:
+                    if 0 <= int(numbers.group(1)) <= 23:
+                        _hour = int(numbers.group(1))
+                    else:
+                        _hour = 0
+                change_text.update_text(change_text.text, pattern)
+            except AttributeError:
+                _hour = 1
+
+        if 'мин' in change_text.text:
+            pattern = r'\s*(\d*)\s*(минут|минуты|минуту|мин)\b'
+            numbers = search(pattern, change_text.text)
+            try:
+                if numbers.group(1) == '':
+                    _minute = 1
+                else:
+                    if 0 <= int(numbers.group(1)) <= 59:
+                        _minute = int(numbers.group(1))
+                    else:
+                        _minute = 0
+                change_text.update_text(change_text.text, pattern)
+            except AttributeError:
+                _minute = 1
+
+        if 'секунд' in change_text.text:
+            pattern = r'\s*(\d*)\s*(секунд|секунды|секунду|сек)'
+            numbers = search(pattern, change_text.text)
+            try:
+                if numbers.group(1) == '':
+                    _second = 1
+                else:
+                    if 0 <= int(numbers.group(1)) <= 59:
+                        _second = int(numbers.group(1))
+                    else:
+                        _second = 1
+                change_text.update_text(change_text.text, pattern)
+            except AttributeError:
+                _second = 1
+
+        return [
+            _weekday,
+            _day,
+            _hour,
+            _minute,
+            _second,
+            _start_date,
+            _time_zone
+        ]
+
+    except Exception as e:
+        logger.error(f'Во время обработки интервальной даты произошла ошибка: {e}')
+        raise e
+

@@ -1,13 +1,13 @@
 from aiogram import F, Router
 from aiogram.filters import CommandStart, Command
-from aiogram.types import Message
-from app.app.keyboards import keyboard as kb
+from aiogram.types import Message, CallbackQuery
+from app.app.keyboards import keyboard as kb, type_reminder as tr
 from app.app.states import ReminderStates
 from aiogram.fsm.context import FSMContext
 from app.app.deferred_task import (add_one_reminder_to_scheduler, get_all_user_reminders,
-                                   get_id_all_user_reminders, del_user_reminders)
-from app.app.parse_time import parse_time_zone, parse_text_in_date
-from app.remind_db.db_excecuter import add_user_to_db, get_user_timezone, del_reminder
+                                   get_id_all_user_reminders, del_user_reminders, add_interval_reminder_to_scheduler)
+from app.app.parse_time import parse_time_zone, parse_text_in_date, interval_trigger
+from app.remind_db.db_excecuter import add_user_to_db, get_user_timezone, del_date_reminder
 from logger_config import get_logger
 from app.app.help import description
 
@@ -56,22 +56,29 @@ async def add_timezone_to_db(message: Message, state: FSMContext):
 
 
 @router.message(Command('create'))
-async def cmd_create(message: Message, state: FSMContext):
+async def cmd_create(message: Message):
     logger.info(f'Пользователь {message.from_user.id} начал создавать событие')
-    await state.set_state(condition.messages)
-    await message.answer(f'\U0000270D О чём тебе напомнить?')
+    await message.answer(f'\U0000270D Выбери тип события', reply_markup=tr)
 
 
-@router.message(condition.messages)
+@router.callback_query(F.data == 'date')
+async def cmd_date(callback: CallbackQuery, state: FSMContext):
+    logger.info(f'Пользователь {callback.message.from_user.id} выбрал Разовое напоминание')
+    await callback.answer()
+    await state.set_state(condition.date_messages)
+    await callback.message.edit_text('\U0000270D О чём напомнить?')
+
+
+@router.message(condition.date_messages)
 async def reminder_date(message: Message, state: FSMContext):
     logger.info(f'Пользователь прислал нам событие, о котором нужно напоминть: {message.text}')
     await state.update_data(message=message.text)
-    await state.set_state(condition.reminder_date)
+    await state.set_state(condition.date_reminder_date)
     logger.info(f'Спрашиваем у пользователя дату')
     await message.answer(f'\U000023F0 Когда напомнить?\n\n')
 
 
-@router.message(condition.reminder_date)
+@router.message(condition.date_reminder_date)
 async def add_reminder(message: Message, state: FSMContext):
     await state.update_data(reminder_date=message.text)
     data = await state.get_data()
@@ -83,7 +90,7 @@ async def add_reminder(message: Message, state: FSMContext):
         logger.error(f'При обработке даты {data["reminder_date"]} была получена ошибка: {e}')
         await message.answer(f'К сожалению я не смог найти нужную дату \U0001FAE3 \n\n'
                              f'Напиши дату в другом формате \U0001F64F')
-        await state.set_state(condition.messages)
+        await state.set_state(condition.date_messages)
         await reminder_date(message, state)
         return
 
@@ -100,6 +107,50 @@ async def add_reminder(message: Message, state: FSMContext):
             logger.info('Событие добавлено')
     except Exception as e:
         logger.info(f'Не удалось сохранить событие, ошибка: {e}')
+        await message.answer(f'\U0001F61E Упс, произошла ошибка. Повторите попытку')
+
+    await state.clear()
+
+
+@router.callback_query(F.data == 'trigger')
+async def cmd_trigger(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
+    await state.set_state(condition.trigger_messages)
+    await callback.message.edit_text('\U0000270D О чём напоминать?')
+
+
+@router.message(condition.trigger_messages)
+async def reminder_trigger(message: Message, state: FSMContext):
+    logger.info(f'Получили от пользователя событие: {message.text}')
+    await state.update_data(message=message.text)
+    await state.set_state(condition.trigger_reminder_date)
+    await message.answer('\U000023F0 Как часто напоминать?\nПример: каждый 2 часа, каждый день, каждые 3 недели')
+
+
+@router.message(condition.trigger_reminder_date)
+async def add_trigger_reminder(message: Message, state: FSMContext):
+    await state.update_data(reminder_date=message.text)
+    data = await state.get_data()
+    try:
+        time_zone = await get_user_timezone(message.chat.id)
+        if not time_zone:
+            await message.answer(f'\U00002639 Ты не указал свой часовой пояс!\n\n'
+                                 f'Настрой свой часовой пояс тут \U0001F449 /timezone и повтори поптыку')
+            await state.clear()
+        else:
+            try:
+                logger.info(f'Парсим сообщение пользователя: {data["reminder_date"]}')
+                parse_date = await interval_trigger(time_zone, data["reminder_date"])
+                logger.info('Добавляем событие в очередь>')
+                await add_interval_reminder_to_scheduler(data["message"], parse_date, message.chat.id)
+                await message.answer(f'\U0001FAF0 Событие добавлено!')
+                logger.info('Событие добавлено')
+            except Exception as e:
+                logger.error(f'При работе с текстом была получена ошибка: {e}')
+                raise e
+
+    except Exception as e:
+        logger.error(f'Не удалось сохранить событие, ошибка: {e}')
         await message.answer(f'\U0001F61E Упс, произошла ошибка. Повторите попытку')
 
     await state.clear()
@@ -136,10 +187,11 @@ async def reminder_delete(message: Message, state: FSMContext):
     await state.update_data(remind_id=message.text)
 
     data = await state.get_data()
+    logger.info(reminders)
     if reminders[int(data['remind_id']) - 1]:
         try:
             await del_user_reminders(reminders[int(data['remind_id']) - 1])
-            await del_reminder(reminders[int(data['remind_id']) - 1])
+            await del_date_reminder(reminders[int(data['remind_id']) - 1])
             await message.answer(f'Событие удалено!')
             await state.clear()
         except Exception:
@@ -162,9 +214,8 @@ async def btn_events(message: Message):
 
 
 @router.message(F.text.lower() == 'новое событие')
-async def btn_create(message: Message, state: FSMContext):
-    await state.set_state(condition.messages)
-    await cmd_create(message, state)
+async def btn_create(message: Message):
+    await cmd_create(message)
     return
 
 
@@ -183,7 +234,7 @@ async def btn_delete(message: Message, state: FSMContext):
 
 @router.message(F.text.lower().startswith('напомни'))
 async def remind_my_text(message: Message, state: FSMContext):
-    await state.set_state(condition.reminder_date)
+    await state.set_state(condition.date_reminder_date)
     await state.update_data(message=message.text[message.text.find('напомни') + 8:], reminder_date=message.text)
     await add_reminder(message, state)
     return

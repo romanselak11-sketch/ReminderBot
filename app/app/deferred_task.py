@@ -2,7 +2,9 @@ from pytz import FixedOffset
 from config import scheduler
 from app.app.response_handlers import user_response
 from logger_config import get_logger
-from app.remind_db.db_excecuter import add_reminder_to_db
+from app.remind_db.db_excecuter import add_date_reminder_to_db, add_interval_reminder_to_db
+from uuid import uuid4
+from apscheduler.triggers.interval import IntervalTrigger
 
 logger = get_logger(__name__)
 
@@ -10,32 +12,61 @@ logger = get_logger(__name__)
 async def add_one_reminder_to_scheduler(message, reminder_date, chat_id, time_zone):
     tz = FixedOffset(time_zone)
     reminder_date = tz.localize(reminder_date)
+    _id = str(uuid4())
     try:
         try:
-            await add_reminder_to_db(chat_id, time_zone, message, reminder_date)
+            await add_date_reminder_to_db(chat_id, time_zone, message, reminder_date, _id)
         except Exception as e:
-            logger.error(f'При записи в Бд произошла ошибкка: {e}')
+            logger.error(f'При записи события в Бд произошла ошибкка: {e}')
 
         scheduler.add_job(
             func=user_response,
             trigger='date',
             run_date=reminder_date,
-            args=(chat_id, message, f'{chat_id}_to_{reminder_date}'),
-            id=f'{chat_id}_to_{reminder_date}')
+            args=(chat_id, message, _id),
+            id=_id,
+            misfire_grace_time=30,
+            coalesce=True,
+            max_instances=5
+        )
 
     except Exception as e:
-        logger.info(f'При добавлении напоминания, произошла ошибка: {e}')
+        logger.error(f'При добавлении напоминания, произошла ошибка: {e}')
         return Exception
+
+
+async def add_interval_reminder_to_scheduler(message, reminder_date, chat_id):
+    _id = str(uuid4())
+    logger.info(f'Тест: {reminder_date}')
+    week, d, h, m, s, start, tz = reminder_date
+    try:
+        try:
+            await add_interval_reminder_to_db(chat_id, message, reminder_date, _id)
+        except Exception as e:
+            logger.error(f'При записи события в Бд произошла ошибкка: {e}')
+        scheduler.add_job(
+            func=user_response,
+            trigger=IntervalTrigger(weeks=week, days=d, hours=h, minutes=m, seconds=s, start_date=start, timezone=tz),
+            args=(chat_id, message, _id),
+            id=_id,
+            misfire_grace_time=30,
+            coalesce=True,
+            max_instances=5
+        )
+    except Exception as e:
+        logger.error(f'При добавлении напоминания, произошла ошибка: {e}')
+        return Exception
+
 
 async def get_all_user_reminders(chat_id):
     logger.info(f'Ищем события в планировщике')
     try:
         all_reminders = scheduler.get_jobs()
-
+        logger.info(all_reminders)
         all_user_reminders = [
-            f'Дата: {reminder.next_run_time.strftime('%d.%m.%Y %H:%M')}, Событие: {reminder.args[1]}'
-            for reminder in all_reminders if str(chat_id) in reminder.id]
-
+            f'Дата: {reminder.next_run_time}, Событие: {reminder.args[1]}'
+            for reminder in all_reminders if chat_id == reminder.args[0]]
+        logger.info(all_user_reminders)
         if all_user_reminders:
             return [f'\U000023F0 {key + 1}) {reminder}' for key, reminder in enumerate(all_user_reminders)]
         else:
@@ -49,12 +80,12 @@ async def get_id_all_user_reminders(chat_id):
     logger.info(f'Ищем id события для пользователя {chat_id}')
     try:
         all_reminders = scheduler.get_jobs()
-        all_user_reminders = [reminder.id for reminder in all_reminders if str(chat_id) in reminder.id]
+        all_user_reminders = [reminder.id for reminder in all_reminders if chat_id == reminder.args[0]]
 
         if all_user_reminders:
             return all_user_reminders
         else:
-            return False
+            return []
     except Exception as e:
         logger.error(f'При поиске событий произошла ошибка: {e}')
         raise Exception
