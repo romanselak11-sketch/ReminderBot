@@ -7,7 +7,7 @@ class ReminderStates(StatesGroup):
     reminder_delete = State()
     date_messages = State()
     date_reminder_date = State()
-    trigger_messages = State()
-    trigger_reminder_date = State()
+    cron_messages = State()
+    cron_reminder_date = State()
 
 

@@ -5,9 +5,6 @@ from app.remind_db.db_connect import ReminderDB
 from app.app.restart_task import restart_task
 
 
-Db = ReminderDB()
-
-
 async def main():
     scheduler.start()
     dp.include_router(router)

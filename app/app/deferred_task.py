@@ -2,9 +2,8 @@ from pytz import FixedOffset
 from config import scheduler
 from app.app.response_handlers import user_response
 from logger_config import get_logger
-from app.remind_db.db_excecuter import add_date_reminder_to_db, add_interval_reminder_to_db
+from app.remind_db.db_excecuter import add_date_reminder_to_db
 from uuid import uuid4
-from apscheduler.triggers.interval import IntervalTrigger
 
 logger = get_logger(__name__)
 
@@ -29,29 +28,33 @@ async def add_one_reminder_to_scheduler(message, reminder_date, chat_id, time_zo
             coalesce=True,
             max_instances=5
         )
-
     except Exception as e:
         logger.error(f'При добавлении напоминания, произошла ошибка: {e}')
         return Exception
 
 
-async def add_interval_reminder_to_scheduler(message, reminder_date, chat_id):
+async def add_cron_reminder_to_scheduler(message, reminder_date, chat_id, time_zone):
+    tz = FixedOffset(time_zone)
+    minute, hour, day, month, weekday = reminder_date.split(' ')
     _id = str(uuid4())
-    logger.info(f'Тест: {reminder_date}')
-    week, d, h, m, s, start, tz = reminder_date
     try:
         try:
-            await add_interval_reminder_to_db(chat_id, message, reminder_date, _id)
+            await add_date_reminder_to_db(chat_id, time_zone, message, reminder_date, _id)
         except Exception as e:
             logger.error(f'При записи события в Бд произошла ошибкка: {e}')
+
         scheduler.add_job(
             func=user_response,
-            trigger=IntervalTrigger(weeks=week, days=d, hours=h, minutes=m, seconds=s, start_date=start, timezone=tz),
+            trigger='cron',
+            minute=minute,
+            hour=hour,
+            day=day,
+            month=month,
+            day_of_week=weekday,
             args=(chat_id, message, _id),
             id=_id,
-            misfire_grace_time=30,
-            coalesce=True,
-            max_instances=5
+            timezone=tz,
+            replace_existing=True
         )
     except Exception as e:
         logger.error(f'При добавлении напоминания, произошла ошибка: {e}')

@@ -5,8 +5,8 @@ from app.app.keyboards import keyboard as kb, type_reminder as tr
 from app.app.states import ReminderStates
 from aiogram.fsm.context import FSMContext
 from app.app.deferred_task import (add_one_reminder_to_scheduler, get_all_user_reminders,
-                                   get_id_all_user_reminders, del_user_reminders, add_interval_reminder_to_scheduler)
-from app.app.parse_time import parse_time_zone, parse_text_in_date, interval_trigger
+                                   get_id_all_user_reminders, del_user_reminders, add_cron_reminder_to_scheduler)
+from app.app.parse_time import parse_time_zone, parse_text_in_date, parse_text_in_cron
 from app.remind_db.db_excecuter import add_user_to_db, get_user_timezone, del_date_reminder
 from logger_config import get_logger
 from app.app.help import description
@@ -112,25 +112,37 @@ async def add_reminder(message: Message, state: FSMContext):
     await state.clear()
 
 
-@router.callback_query(F.data == 'trigger')
-async def cmd_trigger(callback: CallbackQuery, state: FSMContext):
+@router.callback_query(F.data == 'cron')
+async def cmd_date(callback: CallbackQuery, state: FSMContext):
+    logger.info(f'Пользователь {callback.message.from_user.id} выбрал напомнинаие по расписанию')
     await callback.answer()
-    await state.set_state(condition.trigger_messages)
+    await state.set_state(condition.cron_messages)
     await callback.message.edit_text('\U0000270D О чём напоминать?')
 
-
-@router.message(condition.trigger_messages)
-async def reminder_trigger(message: Message, state: FSMContext):
-    logger.info(f'Получили от пользователя событие: {message.text}')
+@router.message(condition.cron_messages)
+async def reminder_date(message: Message, state: FSMContext):
+    logger.info(f'Пользователь прислал нам событие, о котором нужно напоминть: {message.text}')
     await state.update_data(message=message.text)
-    await state.set_state(condition.trigger_reminder_date)
-    await message.answer('\U000023F0 Как часто напоминать?\nПример: каждый 2 часа, каждый день, каждые 3 недели')
+    await state.set_state(condition.cron_reminder_date)
+    logger.info(f'Спрашиваем у пользователя дату')
+    await message.answer(f'\U000023F0 Когда напоминать?\n\n')
 
 
-@router.message(condition.trigger_reminder_date)
-async def add_trigger_reminder(message: Message, state: FSMContext):
+@router.message(condition.cron_reminder_date)
+async def add_cron(message: Message, state: FSMContext):
     await state.update_data(reminder_date=message.text)
     data = await state.get_data()
+    logger.info(f'Парсим сообщение  полученное от пользователя: {data['reminder_date']} в дату')
+
+    try:
+        parse_date = await parse_text_in_cron(data['reminder_date'])
+    except Exception as e:
+        logger.error(f'При обработке даты {data["reminder_date"]} получена ошибка: {e}')
+        await message.answer(f'К сожалению я не смог найти нужную дату \U0001FAE3 \n\n'
+                             f'Напиши дату в другом формате \U0001F64F')
+        await state.set_state(condition.cron_messages)
+        await reminder_date(message, state)
+        return
     try:
         time_zone = await get_user_timezone(message.chat.id)
         if not time_zone:
@@ -138,24 +150,15 @@ async def add_trigger_reminder(message: Message, state: FSMContext):
                                  f'Настрой свой часовой пояс тут \U0001F449 /timezone и повтори поптыку')
             await state.clear()
         else:
-            try:
-                logger.info(f'Парсим сообщение пользователя: {data["reminder_date"]}')
-                parse_date = await interval_trigger(time_zone, data["reminder_date"])
-                logger.info('Добавляем событие в очередь>')
-                await add_interval_reminder_to_scheduler(data["message"], parse_date, message.chat.id)
-                await message.answer(f'\U0001FAF0 Событие добавлено!')
-                logger.info('Событие добавлено')
-            except Exception as e:
-                logger.error(f'При работе с текстом была получена ошибка: {e}')
-                raise e
-
+            logger.info('Добавляем событие в очередь>')
+            await add_cron_reminder_to_scheduler(data['message'], parse_date, message.chat.id, time_zone)
+            await message.answer(f'\U0001FAF0 Событие добавлено!')
+            logger.info('Событие добавлено')
     except Exception as e:
-        logger.error(f'Не удалось сохранить событие, ошибка: {e}')
+        logger.info(f'Не удалось сохранить событие, ошибка: {e}')
         await message.answer(f'\U0001F61E Упс, произошла ошибка. Повторите попытку')
 
     await state.clear()
-
-
 @router.message(Command('events'))
 async def cmd_events(message: Message):
     logger.info('Ищем события пользователя')

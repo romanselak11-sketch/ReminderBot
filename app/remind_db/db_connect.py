@@ -61,4 +61,3 @@ class ReminderDB:
                 logger.error(f'Ошибка при закрытии соединения: {e}')
             finally:
                 self._engine = None
-

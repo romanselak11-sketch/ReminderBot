@@ -3,8 +3,7 @@ from dateutil.relativedelta import relativedelta
 from config import MONTHS, WEEKDAYS
 from logger_config import get_logger
 from re import search, split
-from pytz import FixedOffset
-from apscheduler.triggers.cron import CronTrigger
+
 
 logger = get_logger(__name__)
 
@@ -39,13 +38,12 @@ async def parse_text_in_date(text: str):
 
     try:
 
-        if 'чере' in change_text.text:
+        if 'через' in change_text.text:
             result_date = await _parse_in_an_time(result_date)
 
         if 'сегодня' in change_text.text:
             result_date = (result_date + timedelta(days=0))
             change_text.update_text(change_text.text, r'\bсегодня\b')
-            logger.info(f'текст: {change_text.text}')
 
         if 'завтра' in change_text.text:
             result_date = (result_date + timedelta(days=1))
@@ -56,7 +54,7 @@ async def parse_text_in_date(text: str):
             change_text.update_text(change_text.text, r'\bпослезавтра\b')
 
         for key, value in MONTHS.items():
-            if key in text:
+            if key in change_text.text:
                 current_month = result_date.month
                 change_text.update_text(change_text.text, key)
                 if value >= current_month:
@@ -66,14 +64,13 @@ async def parse_text_in_date(text: str):
                 result_date = result_date + relativedelta(months=result_month)
 
         for key, value in WEEKDAYS.items():
-            if key in text:
+            if key in change_text.text:
                 delta_days = (value - result_date.weekday()) % 7
                 change_text.update_text(change_text.text, key)
                 if delta_days == 0:
                     result_date = result_date
                 else:
                     result_date = result_date + timedelta(days=delta_days)
-        logger.info(f'Текст: {change_text.text}')
         result_date = await _parse_in_an_time(result_date)
 
         if result_time:
@@ -98,6 +95,7 @@ async def _parse_in_an_time(result_date: datetime):
             else:
                 result_date = (result_date + timedelta(days=int(numbers.group(1))))
             change_text.update_text(change_text.text, pattern)
+            logger.info(change_text.text)
         except AttributeError:
             result_date = (result_date + timedelta(days=1))
 
@@ -241,127 +239,135 @@ async def parse_time_zone(text: str):
         return False
 
 
-async def corn_trigger(time_zone, text: str):
-    _year = ''
-    _month = ''
-    _week = ''
-    _day = ''
-    _day_of_week = ''
-    _hour = ''
-    _minute = ''
-    _second = ''
-    _timezone = time_zone
+async def parse_text_in_cron(text: str):
+    change_text.text = text.strip().lower()
+    current_date = datetime.now()
+    month = '*'
+    day = '*'
+    hour = '*'
+    minute = '0'
+    weekday = '*'
 
+    if 'день' in change_text.text or 'дня' in change_text.text or 'дней' in change_text.text:
+        pattern = r'кажд..?\s+(\d*)\s+(?:день|дня|дней)'
+        numbers = search(pattern, change_text.text)
+        try:
+            if numbers.group(1) in ['', '1']:
+                day = '*'
+            else:
+                day = f'*/{int(numbers.group(1))}'
+            change_text.update_text(change_text.text, pattern)
+        except AttributeError as e:
+            logger.error(f'При обработке дня получена ошибка: {e}')
+            day = '*'
 
+    if 'числ' in change_text.text:
+        pattern = r'кажд..?\s+(\d+)\s+(?:число|числа|числу)'
+        numbers = search(pattern, change_text.text)
+        try:
+            if numbers.group(1) in ['', '1']:
+                day = '1'
+            else:
+                day = f'{int(numbers.group(1))}'
+            change_text.update_text(change_text.text, pattern)
+        except AttributeError as e:
+            logger.error(f'При обработке числа получена ошибка: {e}')
+            day = '1'
 
-    '''
-    Каждый/Определенный
-    год/месяц/неделю/день/час/минуту/секунду
-    
-    каждый год 7 марта в 15:00
-    
-    25 числа каждого месяца
-    
-    каждый понедельник в 8:00
-    
-    в рабочие дни с 8-17 каждый час
-    
-    каждую 3ью неделю в 10 часов 40 минут
-    '''
-    pass
-
-
-async def interval_trigger(time_zone, text):
-    _weekday = 0
-    _day = 0
-    _hour = 0
-    _minute = 0
-    _second = 0
-    _start_date = datetime.now()
-    _time_zone = FixedOffset(time_zone)
-    change_text.text = text
-
-    try:
-        if 'недел' in change_text.text:
-            pattern = r'\s*(\d*)\s*(неделю|недели|недель|нед)'
-            numbers = search(pattern, change_text.text)
-            try:
-                if numbers.group(1) == '':
-                    _weekday = 1
+    if 'недел' in change_text.text:
+        pattern = r'кажд..\s*(\d*)\s*(неделю|недели|недель|нед)'
+        numbers = search(pattern, change_text.text)
+        try:
+            if numbers.group(1) in ['', '1']:
+                day = '*/7'
+            else:
+                if int(numbers.group(1)) <= 52:
+                    day = f'*/{int(numbers.group(1)) * 7}'
                 else:
-                    _weekday = int(numbers.group(1))
-                change_text.update_text(change_text.text, pattern)
-            except AttributeError:
-                _weekday = 1
+                    raise ValueError('некорректное значение недели')
+            change_text.update_text(change_text.text, pattern)
+        except AttributeError as e:
+            logger.error(f'При обработке недели получена ошибка: {e}')
+            day = '*/7'
 
-        if 'день' in change_text.text or 'дня' in change_text.text or 'дней' in change_text.text:
-            pattern = r'\s*(\d*)\s*(день|дня|дней)'
-            numbers = search(pattern, change_text.text)
-            try:
-                if numbers.group(1) == '':
-                    _day = 1
+    if 'месяц' in change_text.text:
+        pattern = r'кажд..\s*(\d*)\s*(месяц|месяца|месяцев|мес)'
+        numbers = search(pattern, change_text.text)
+        try:
+            if numbers.group(1) in ['', '1']:
+                month = '*'
+            else:
+                if int(numbers.group(1)) <= 12:
+                    month = f'*/{int(numbers.group(1))}'
                 else:
-                    _day = int(numbers.group(1))
-                change_text.update_text(change_text.text, pattern)
-            except AttributeError:
-                _day = 1
+                    raise ValueError('Неорректное значение месяца')
+            change_text.update_text(change_text.text, pattern)
+        except AttributeError:
+            logger.error(f'При обработке месяца получена ошибка: {e}')
+            month = '*'
 
-        if 'час' in change_text.text:
-            pattern = r'\s*(\d*)\s*(час|часа|часов)'
-            numbers = search(pattern, change_text.text)
-            try:
-                if numbers.group(1) == '':
-                    _hour = 1
+    if 'час' in change_text.text:
+        pattern = r'кажд..\s*(\d*)\s*(час|часа|часов)'
+        numbers = search(pattern, change_text.text)
+        try:
+            if numbers.group(1) in ['', '1']:
+                hour = '*'
+            else:
+                if int(numbers.group(1)) < 23:
+                    hour = f'*/{int(numbers.group(1))}'
                 else:
-                    if 0 <= int(numbers.group(1)) <= 23:
-                        _hour = int(numbers.group(1))
-                    else:
-                        _hour = 0
-                change_text.update_text(change_text.text, pattern)
-            except AttributeError:
-                _hour = 1
+                    raise ValueError('Неорректное значение часов')
 
-        if 'мин' in change_text.text:
-            pattern = r'\s*(\d*)\s*(минут|минуты|минуту|мин)\b'
-            numbers = search(pattern, change_text.text)
-            try:
-                if numbers.group(1) == '':
-                    _minute = 1
+            change_text.update_text(change_text.text, pattern)
+        except AttributeError:
+            logger.error(f'При обработке часа получена ошибка: {e}')
+            hour = '*'
+
+    if 'минут' in change_text.text:
+        pattern = r'кажд..\s*(\d*)\s*(минут|минуты|минуту|мин)\b'
+        numbers = search(pattern, change_text.text)
+        try:
+            if numbers.group(1) in ['', '1']:
+                minute = '*'
+            else:
+                if int(numbers.group(1)) <= 59:
+                    minute = f'*/{int(numbers.group(1))}'
                 else:
-                    if 0 <= int(numbers.group(1)) <= 59:
-                        _minute = int(numbers.group(1))
-                    else:
-                        _minute = 0
-                change_text.update_text(change_text.text, pattern)
-            except AttributeError:
-                _minute = 1
+                    raise ValueError('Неорректное значение минут')
+            change_text.update_text(change_text.text, pattern)
+        except AttributeError:
+            logger.error(f'При обработке минут получена ошибка: {e}')
+            minute = '0'
 
-        if 'секунд' in change_text.text:
-            pattern = r'\s*(\d*)\s*(секунд|секунды|секунду|сек)'
-            numbers = search(pattern, change_text.text)
-            try:
-                if numbers.group(1) == '':
-                    _second = 1
-                else:
-                    if 0 <= int(numbers.group(1)) <= 59:
-                        _second = int(numbers.group(1))
-                    else:
-                        _second = 1
-                change_text.update_text(change_text.text, pattern)
-            except AttributeError:
-                _second = 1
+    for key, value in MONTHS.items():
+        if key in change_text.text:
+            current_month = current_date.month
+            change_text.update_text(change_text.text, key)
+            if value >= current_month:
+                result_month = value - current_month
+            else:
+                result_month = (12 - current_month) + value
+            month = f'{result_month}'
 
-        return [
-            _weekday,
-            _day,
-            _hour,
-            _minute,
-            _second,
-            _start_date,
-            _time_zone
-        ]
+    for key, value in WEEKDAYS.items():
+        if key in change_text.text:
+            delta_days = (value - current_date.weekday()) % 7
+            change_text.update_text(change_text.text, key)
+            if delta_days == 0:
+                weekday = f'{current_date.weekday()}'
+            else:
+                weekday = f'{value}'
+    cron_time = await _parse_time()
+    if cron_time:
+        hour = str(cron_time.hour)
+        minute = str(cron_time.minute)
 
-    except Exception as e:
-        logger.error(f'Во время обработки интервальной даты произошла ошибка: {e}')
-        raise e
+    if 'будни' in change_text.text or 'будням' in change_text.text:
+        day = '1-5'
+        change_text.update_text(change_text.text, r'будн..')
 
+    if 'выходн' in change_text.text:
+        day = '6-0'
+        change_text.update_text(change_text.text, r'выходн..')
+
+    return ' '.join([minute, hour, day, month, weekday])

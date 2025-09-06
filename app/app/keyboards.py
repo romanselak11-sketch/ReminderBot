@@ -1,6 +1,5 @@
 from aiogram.types import (ReplyKeyboardMarkup, KeyboardButton,
                            InlineKeyboardMarkup, InlineKeyboardButton)
-from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 
 keyboard = ReplyKeyboardMarkup(keyboard=[
@@ -9,8 +8,8 @@ keyboard = ReplyKeyboardMarkup(keyboard=[
 ], resize_keyboard=True, input_field_placeholder='Выберите действие из меню', is_persistent=True)
 
 type_reminder = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text='Повторяющееся ', callback_data='trigger'), InlineKeyboardButton(text='По расписанию', callback_data='cron')],
-    [InlineKeyboardButton(text='Разовое', callback_data='date')],
+    [InlineKeyboardButton(text='Разовое', callback_data='date'),
+     InlineKeyboardButton(text='По расписанию', callback_data='cron')]
 ])
 
 
